@@ -1,3 +1,7 @@
+This is a Project i made for my gran, its a simple users interface that only uses one Rotary encoder to select a satation 
+
+
+
 Auto-Start Instructions for Raspberry Pi:
 
     Create a Service File:
