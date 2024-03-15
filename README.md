@@ -1,7 +1,7 @@
 This is a Project i made for my gran, its a simple users interface that only uses one Rotary encoder to select a satation 
 
 
-[Wiring](#wiring.md)
+[Wiring](#wiring)
 
 
 Auto-Start Instructions for Raspberry Pi:
