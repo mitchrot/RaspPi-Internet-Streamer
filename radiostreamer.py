@@ -1,4 +1,3 @@
-# Add comments explaining each section of the code
 import RPi.GPIO as GPIO
 import time
 import os
@@ -75,6 +74,7 @@ def lcd_string(message, line):
 def update_lcd(message):
     print("Updating LCD with message:", message)
     lcd_string(message, LCD_LINE_1)
+
 
 # LCD mode
 LCD_CHR = 1  # LCD command
