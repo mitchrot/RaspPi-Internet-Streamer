@@ -2,10 +2,11 @@ import RPi.GPIO as GPIO
 import time
 import os
 import smbus
+import subprocess
 
 # Define GPIO pins
-CLOCK_PIN = 27  # Pin connected to the clock signal of the rotary encoder
-DATA_PIN = 22   # Pin connected to the data signal of the rotary encoder
+CLOCK_PIN = 27
+DATA_PIN = 22
 LCD_POWER_PIN = 4  # GPIO pin connected to LCD power control
 
 # Define radio stations with their names and URLs
@@ -24,15 +25,14 @@ LCD_LINE_2 = 0xC0  # LCD RAM address for the second line
 
 # Global variables
 current_station_index = 0
-player_pid = None
+player_process = None
 
-# Initialize I2C bus for LCD
+# Initialize I2C bus
 bus = smbus.SMBus(1)
 LCD_ADDR = 0x27  # I2C address of the LCD
 
 # LCD functions
 def lcd_init():
-    """Initialize the LCD display."""
     # Initialize display
     lcd_byte(0x33, LCD_CMD)  # Initialize
     lcd_byte(0x32, LCD_CMD)  # Set to 4-bit mode
@@ -43,7 +43,6 @@ def lcd_init():
     time.sleep(0.0005)  # Delay to allow commands to process
 
 def lcd_byte(bits, mode):
-    """Send a byte to the LCD."""
     bits_high = mode | (bits & 0xF0) | LCD_BACKLIGHT
     bits_low = mode | ((bits << 4) & 0xF0) | LCD_BACKLIGHT
 
@@ -56,7 +55,6 @@ def lcd_byte(bits, mode):
     lcd_toggle_enable(bits_low)
 
 def lcd_toggle_enable(bits):
-    """Toggle enable signal of the LCD."""
     # Toggle enable
     time.sleep(0.0005)  # Delay to stabilize enable
     bus.write_byte(LCD_ADDR, (bits | ENABLE))
@@ -65,7 +63,6 @@ def lcd_toggle_enable(bits):
     time.sleep(0.0005)  # Delay to stabilize enable
 
 def lcd_string(message, line):
-    """Display a string on the LCD."""
     print("Displaying message on LCD:", message)
     # Send string to display
     message = message.ljust(LCD_WIDTH, " ")
@@ -75,14 +72,15 @@ def lcd_string(message, line):
         lcd_byte(ord(message[i]), LCD_CHR)
 
 def update_lcd(message):
-    """Update the LCD with a new message."""
     print("Updating LCD with message:", message)
     lcd_string(message, LCD_LINE_1)
 
 
-# LCD mode and flags
+# LCD mode
 LCD_CHR = 1  # LCD command
 LCD_CMD = 0  # LCD data
+
+# LCD flags
 LCD_BACKLIGHT = 0x08  # On
 ENABLE = 0b00000100  # Enable bit
 
@@ -91,13 +89,12 @@ GPIO.setmode(GPIO.BCM)
 GPIO.setup(CLOCK_PIN, GPIO.IN, pull_up_down=GPIO.PUD_UP)
 GPIO.setup(DATA_PIN, GPIO.IN, pull_up_down=GPIO.PUD_UP)
 
-# Initialize global variables for rotary encoder
+# Initialize global variables
 current_state = GPIO.input(DATA_PIN)
 previous_state = current_state
 
 # Define a callback function for rotary encoder
 def rotary_callback(channel):
-    """Callback function for rotary encoder."""
     global current_station_index, previous_state
 
     # Read the current state of the encoder
@@ -121,28 +118,26 @@ def rotary_callback(channel):
 # Register callback for rotary encoder with edge detection
 GPIO.add_event_detect(CLOCK_PIN, GPIO.BOTH, callback=rotary_callback, bouncetime=50)
 
-# Function to start playing a radio station
+# Start station
 def start_station(station_index):
-    """Start playing the selected radio station."""
-    global player_pid
+    global player_process
     try:
         # Stop the previous station
         stop_player()
 
         # Start the new station
-        player_pid = os.spawnlp(os.P_NOWAIT, '/usr/local/bin/vlc-wrapper.sh', '/usr/local/bin/vlc-wrapper.sh', STATIONS[station_index]["url"])
+        player_process = subprocess.Popen(["ffmpeg", "-i", STATIONS[station_index]["url"], "-f", "alsa", "default"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         print(f"Now playing: {STATIONS[station_index]['name']}")
         update_lcd(STATIONS[station_index]['name'])  # Display the station name
     except OSError as e:
-        print(f"Error launching cvlc: {e}")
+        print(f"Error launching ffmpeg: {e}")
 
-# Function to stop the player
+# Stop player
 def stop_player():
-    """Stop the currently playing radio station."""
-    global player_pid
-    if player_pid:
-        os.system(f"kill {player_pid}")
-        player_pid = None
+    global player_process
+    if player_process:
+        player_process.kill()
+        player_process = None
 
 try:
     # Set up GPIO pins for LCD power
@@ -161,4 +156,4 @@ try:
 
 except KeyboardInterrupt:
     GPIO.cleanup()
-    stop_player()  # Stop VLC on exit
+    stop_player()  # Stop ffmpeg on exit
